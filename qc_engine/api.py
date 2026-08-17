@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -56,7 +57,12 @@ async def analyze(file: UploadFile, origin: Optional[DocumentOrigin] = Form(defa
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = Path(tmp) / (file.filename or "upload.pdf")
         pdf_path.write_bytes(await file.read())
-        findings = analyze_pdf(str(pdf_path), origin=origin)
+        # analyze_pdf is CPU-bound (PyMuPDF parsing + regex-heavy rules) and
+        # synchronous. Calling it directly here would block the whole event
+        # loop for the entire analysis — with a single worker process, that
+        # freezes every other request (including /health) for as long as
+        # this one PDF takes. run_in_threadpool keeps the loop free.
+        findings = await run_in_threadpool(analyze_pdf, str(pdf_path), origin=origin)
 
     return AnalyzeResponse(findings=findings)
 
