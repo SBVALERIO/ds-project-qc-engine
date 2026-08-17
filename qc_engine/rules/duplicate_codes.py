@@ -25,7 +25,10 @@ from ..schedule_parsing import Rows, find_schedule_blocks, row_text
 from .base import Rule
 
 HEADER_PATTERN = re.compile(r"SCHEDULE|LEGEND", re.IGNORECASE)
-GENERIC_LEGEND_HEADER = re.compile(r"^LEGEND$", re.IGNORECASE)
+# Revit-authored sheets label this "LEGEND:" (trailing colon); AutoCAD ones
+# just "LEGEND" — confirmed against a real Revit package where the colon
+# variant slipped past a colon-less pattern and produced false positives.
+GENERIC_LEGEND_HEADER = re.compile(r"^LEGEND:?$", re.IGNORECASE)
 
 
 class DuplicateScheduleCodeRule(Rule):
