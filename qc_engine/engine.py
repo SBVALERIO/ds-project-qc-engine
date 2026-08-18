@@ -9,7 +9,6 @@ from .pdf_ingest import load_document
 from .rules.base import Rule
 from .rules.ceiling_height_match import CeilingHeightMatchRule
 from .rules.door_clearance import DoorClearanceRule
-from .rules.door_spec_completeness import DoorSpecCompletenessRule
 from .rules.duplicate_codes import DuplicateScheduleCodeRule
 from .rules.fixture_quantity import FixtureQuantityRule
 from .rules.placeholder_quantities import PlaceholderQuantityRule
@@ -23,7 +22,6 @@ RULES: list[Rule] = [
     DuplicateScheduleCodeRule(),
     PlaceholderQuantityRule(),
     DoorClearanceRule(),
-    DoorSpecCompletenessRule(),
     RevisionSequenceRule(),
     UnresolvedConstructionDimensionRule(),
     UnresolvedFinishRule(),
