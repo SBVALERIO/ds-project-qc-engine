@@ -1,11 +1,16 @@
 """Shared parsing for DS's schedule/legend table layout.
 
 Every DS schedule (Door Schedule, Floor/Wall/Ceiling Finish Legend, ...)
-follows the same shape: a heading, then rows keyed by a short code set in
-a noticeably larger font than the row's own content. This locates those
-blocks and groups each block's spans into rows by code, without assuming
-anything about what the row *means* — that's left to the caller (duplicate
-code checks, door width checks, etc.).
+follows the same shape: a heading, then rows keyed by a short code. Which
+column is the code isn't always visually obvious — AutoCAD-authored
+sheets set it in a font distinctly larger than the row's own content
+(e.g. "D2" at 12.4pt next to 6pt description text), but Revit's default
+schedule export renders the whole table at one uniform size, so code
+detection falls back to x-position clustering in that case (see
+`_pick_code_column`). This locates schedule blocks and groups each one's
+spans into rows by code, without assuming anything about what the row
+*means* — that's left to the caller (duplicate code checks, door width
+checks, etc.).
 """
 
 from __future__ import annotations
@@ -16,7 +21,11 @@ from typing import Optional
 
 from .models import Page, TextSpan
 
-CODE_PATTERN = re.compile(r"^[A-Z]{0,3}\.?\d{1,3}(\.[A-Z0-9]{1,3})?$")
+# DS uses both "D2.A" (dot) and "D-1" (hyphen) separator conventions
+# across different offices/authoring tools — confirmed against a real
+# Revit-authored Door Schedule using hyphens where the AutoCAD ones we'd
+# calibrated against used dots.
+CODE_PATTERN = re.compile(r"^[A-Z]{0,3}[-.]?\d{1,3}([-.][A-Z0-9]{1,3})?$")
 
 DEFAULT_MIN_HEADER_SIZE = 7.0
 DEFAULT_COLUMN_WIDTH = 450  # pt, how far right of the header a row's text can sit
@@ -78,15 +87,21 @@ def _group_into_rows(pool: list[TextSpan], min_rows: int) -> Rows:
     if not pool:
         return {}
 
-    # The code column sits in the single largest font present in the
-    # block's own text — distinctly bigger than any row description.
+    # DS usually sets the code column in a font distinctly larger than the
+    # row's own content (a "D2" at 12.4pt next to 6pt description text) —
+    # but Revit's default schedule export renders every column at one
+    # uniform size, so more than one column (e.g. MARK and COUNT) can
+    # equally match CODE_PATTERN at "the largest size." Clustering the
+    # candidates by x-position and keeping the leftmost cluster resolves
+    # that: a code column reads as a tight, repeated x-position across
+    # rows, and codes conventionally lead a schedule row while a trailing
+    # quantity/count column comes after the descriptive columns.
     code_size = max(s.size for s in pool)
-    code_spans = sorted(
-        (s for s in pool if abs(s.size - code_size) < 0.3 and CODE_PATTERN.match(s.text)),
-        key=lambda s: s.y0,
-    )
+    size_matches = [s for s in pool if abs(s.size - code_size) < 0.3 and CODE_PATTERN.match(s.text)]
+    code_spans = sorted(_pick_code_column(size_matches, min_rows), key=lambda s: s.y0)
     if len(code_spans) < min_rows:
         return {}
+    code_span_ids = {id(s) for s in code_spans}
 
     rows: Rows = defaultdict(list)
     for i, code_span in enumerate(code_spans):
@@ -105,12 +120,39 @@ def _group_into_rows(pool: list[TextSpan], min_rows: int) -> Rows:
             (
                 s
                 for s in pool
-                if row_start <= s.y0 < row_end and s is not code_span and s.size < code_size - 0.3
+                if row_start <= s.y0 < row_end and id(s) not in code_span_ids
             ),
             key=lambda s: (round(s.y0), s.x0),
         )
         rows[code_span.text].append(row_spans)
     return rows
+
+
+def _pick_code_column(candidates: list[TextSpan], min_rows: int) -> list[TextSpan]:
+    if not candidates:
+        return []
+
+    clusters: dict[int, list[TextSpan]] = defaultdict(list)
+    for span in candidates:
+        clusters[round(span.x0 / 20)].append(span)
+
+    viable = [spans for spans in clusters.values() if len(spans) >= min_rows]
+    if not viable:
+        return candidates  # single ambiguous match or too few — let the caller's min_rows check reject it
+
+    # A genuine code column has ~one distinct code per row. DS's generic
+    # symbol-key "LEGEND" blocks intentionally reuse a placeholder code
+    # across several rows (e.g. "D00" for four different generic door
+    # types) and can sit at an x-position close enough to a real code
+    # column to tie on position — confirmed on a real sheet where the
+    # LEGEND's "D00"/"G00" column landed left of the Door Schedule's own
+    # MARK column. Preferring more distinct values over raw position
+    # tells the two apart; leftmost-first only breaks a genuine tie.
+    def score(spans: list[TextSpan]) -> tuple[int, float]:
+        return (len({s.text for s in spans}), -min(s.x0 for s in spans))
+
+    viable.sort(key=score, reverse=True)
+    return viable[0]
 
 
 def row_text(spans: list[TextSpan]) -> str:
