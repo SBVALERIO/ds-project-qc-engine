@@ -45,11 +45,19 @@ class AnalyzeResponse(BaseModel):
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(file: UploadFile, origin: Optional[DocumentOrigin] = Form(default=None)) -> AnalyzeResponse:
+async def analyze(
+    file: UploadFile,
+    origin: Optional[DocumentOrigin] = Form(default=None),
+    check_tbd_specs: bool = Form(default=False),
+) -> AnalyzeResponse:
     """`origin` should match the upload flow's own choice ("Project
     Package — Revit" / "— AutoCAD" / "Shop Drawings") — several rules
     only know how to interpret the PDF correctly once they know which
-    authoring tool produced it (see rules/fixture_quantity.py)."""
+    authoring tool produced it (see rules/fixture_quantity.py).
+
+    `check_tbd_specs` flags unresolved ("TBD") finish/material specs —
+    off by default since that's expected on an early-stage package;
+    callers past that stage (a project already in construction) opt in."""
 
     if file.content_type not in ("application/pdf", "application/octet-stream"):
         raise HTTPException(400, "Envie um arquivo PDF.")
@@ -62,7 +70,9 @@ async def analyze(file: UploadFile, origin: Optional[DocumentOrigin] = Form(defa
         # loop for the entire analysis — with a single worker process, that
         # freezes every other request (including /health) for as long as
         # this one PDF takes. run_in_threadpool keeps the loop free.
-        findings = await run_in_threadpool(analyze_pdf, str(pdf_path), origin=origin)
+        findings = await run_in_threadpool(
+            analyze_pdf, str(pdf_path), origin=origin, check_tbd_specs=check_tbd_specs
+        )
 
     return AnalyzeResponse(findings=findings)
 
