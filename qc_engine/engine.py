@@ -15,7 +15,6 @@ from .rules.placeholder_quantities import PlaceholderQuantityRule
 from .rules.revision_sequence import RevisionSequenceRule
 from .rules.typos import SystemicTypoRule
 from .rules.unresolved_construction_dimension import UnresolvedConstructionDimensionRule
-from .rules.unresolved_finish import UnresolvedFinishRule
 
 RULES: list[Rule] = [
     SystemicTypoRule(),
@@ -24,7 +23,6 @@ RULES: list[Rule] = [
     DoorClearanceRule(),
     RevisionSequenceRule(),
     UnresolvedConstructionDimensionRule(),
-    UnresolvedFinishRule(),
     CeilingHeightMatchRule(),
     FixtureQuantityRule(),
 ]
