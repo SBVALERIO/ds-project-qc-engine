@@ -29,7 +29,18 @@ from .titleblock import annotate_titleblocks
 
 def load_document(path: str, origin: Optional[DocumentOrigin] = None) -> Document:
     with fitz.open(path) as pdf:
-        pages = [_extract_page(pdf, index) for index in range(pdf.page_count)]
+        pages = []
+        for index in range(pdf.page_count):
+            pages.append(_extract_page(pdf, index))
+            # MuPDF caches decoded fonts/images per page in a process-wide
+            # store that otherwise keeps growing for the life of the
+            # document — harmless for the small test PDFs this was built
+            # against, but a real architectural package (hundreds of dense
+            # CAD sheets) can push a memory-capped host (Render's free
+            # 512MB) past its limit and get killed mid-request. We only
+            # ever read each page once here, so there's nothing to gain
+            # from keeping it cached — evict it immediately.
+            fitz.TOOLS.store_shrink(100)
     document = Document(source=path, pages=pages, origin=origin)
     # Needs every page loaded first: telling boilerplate title-block chrome
     # apart from the actual sheet number/title relies on seeing what text
