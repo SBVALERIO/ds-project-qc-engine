@@ -26,6 +26,14 @@ KNOWN_TYPOS: dict[str, str] = {
     "SABIATTO": "SABBIATO",
     "CIELING": "CEILING",
     "RECEPTACAL": "RECEPTACLE",
+    # From DS reviewers' Trazo comments on real packages (Hibiscus, Height,
+    # Nook & David): misspellings that were copied into notes/legends.
+    "HARWARE": "HARDWARE",
+    "THICKNEES": "THICKNESS",
+    "WASJING": "WASHING",
+    "BDIDET": "BIDET",
+    "SWITCES": "SWITCHES",
+    "LANDSCAPPING": "LANDSCAPING",
 }
 
 

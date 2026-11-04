@@ -49,6 +49,7 @@ async def analyze(
     file: UploadFile,
     origin: Optional[DocumentOrigin] = Form(default=None),
     check_tbd_specs: bool = Form(default=False),
+    check_visual_rules: Optional[bool] = Form(default=None),
 ) -> AnalyzeResponse:
     """`origin` should match the upload flow's own choice ("Project
     Package — Revit" / "— AutoCAD" / "Shop Drawings") — several rules
@@ -57,7 +58,11 @@ async def analyze(
 
     `check_tbd_specs` flags unresolved ("TBD") finish/material specs —
     off by default since that's expected on an early-stage package;
-    callers past that stage (a project already in construction) opt in."""
+    callers past that stage (a project already in construction) opt in.
+
+    `check_visual_rules` runs the cross-sheet visual rules learned from
+    DS's Trazo reviews (qc_engine/visual_review.py). Left unset, it follows
+    QC_VISUAL_RULES (on/off/auto; auto = on when ANTHROPIC_API_KEY is set)."""
 
     if file.content_type not in ("application/pdf", "application/octet-stream"):
         raise HTTPException(400, "Envie um arquivo PDF.")
@@ -71,7 +76,11 @@ async def analyze(
         # freezes every other request (including /health) for as long as
         # this one PDF takes. run_in_threadpool keeps the loop free.
         findings = await run_in_threadpool(
-            analyze_pdf, str(pdf_path), origin=origin, check_tbd_specs=check_tbd_specs
+            analyze_pdf,
+            str(pdf_path),
+            origin=origin,
+            check_tbd_specs=check_tbd_specs,
+            check_visual_rules=check_visual_rules,
         )
 
     return AnalyzeResponse(findings=findings)
