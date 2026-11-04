@@ -18,6 +18,13 @@ A finish that adds real thickness to the ceiling build-up (wood veneer
 panels, cladding) legitimately shifts the applied height from the raw
 structural height, so schedule rows whose FINISH mentions one of
 THICK_FINISH_KEYWORDS are excluded rather than flagged as a mismatch.
+
+Cross-sheet (added from DS's Trazo review comments: "CH geral do apto nao
+eh 120, e sim 116", "atualizar todos os ceiling heights de acordo com a
+planta PROPOSED... em todas as plantas"): sheets that stamp ceiling codes
+but don't carry the Ceiling Schedule themselves (Lighting, Circuits,
+Flooring, Proposed) are checked against the package's schedule(s) too, so
+a height updated on the RCP but not on the other plans is caught.
 """
 
 from __future__ import annotations
@@ -45,13 +52,35 @@ class CeilingHeightMatchRule(Rule):
 
     def run(self, document: Document) -> list[Finding]:
         findings: list[Finding] = []
+        package_heights: dict[str, list[tuple[float, bool]]] = {}
+        schedule_sheets: list[str] = []
+        pages_without_schedule = []
         for page in document.pages:
             schedule_blocks = find_schedule_blocks(page, HEADER_PATTERN)
             if not schedule_blocks:
+                pages_without_schedule.append(page)
                 continue
+            schedule_sheets.append(page.label())
             for header, rows in schedule_blocks:
                 heights_by_code = _heights_by_code(rows)
+                for code, heights in heights_by_code.items():
+                    package_heights.setdefault(code, []).extend(heights)
                 findings.extend(_check_plan_callouts(page, header, heights_by_code))
+
+        if package_heights:
+            # A header far above the sheet puts every span on these pages
+            # in the "plan" zone — they carry no schedule of their own.
+            virtual_header = TextSpan(text="CEILING SCHEDULE", x0=0, y0=-1e6, x1=0, y1=-1e6, size=0, font="")
+            for page in pages_without_schedule:
+                for finding in _check_plan_callouts(page, virtual_header, package_heights):
+                    finding.title = finding.title.replace("na planta", "em outra prancha")
+                    finding.evidence = "Cross-check"
+                    finding.summary += f" (Ceiling Schedule em {', '.join(schedule_sheets)}.)"
+                    finding.expected = (
+                        "Atualizar a altura desse código em todas as pranchas (RCP, Lighting, Circuits, "
+                        "Flooring, Proposed) para bater com o Ceiling Schedule."
+                    )
+                    findings.append(finding)
         return findings
 
 
