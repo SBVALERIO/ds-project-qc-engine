@@ -37,6 +37,10 @@ class Finding(BaseModel):
     locations: Optional[list[str]] = None
     code_reference: Optional[str] = Field(default=None, alias="codeReference")
     code_url: Optional[str] = Field(default=None, alias="codeUrl")
+    # Where to pin the finding on the sheet in the front end: 1-based PDF
+    # page and [x0, y0, x1, y1] as fractions of the rendered page.
+    page: Optional[int] = None
+    bbox: Optional[list[float]] = None
 
     model_config = {"populate_by_name": True}
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from .models import Document, DocumentOrigin, Finding
@@ -61,7 +62,53 @@ def analyze_document(document: Document, *, check_tbd_specs: bool = False) -> li
     for next_id, finding in enumerate(findings, start=1):
         finding.id = next_id
 
+    attach_positions(document, findings)
     return findings
+
+
+_PAGE_REF = re.compile(r"\bp\. (\d+)")
+_QUOTE = re.compile(r"“([^”]+)”")
+_CODE = re.compile(r"\b[A-Z]{1,3}[-.]?\d{1,3}(?:\.\d)?\b")
+
+
+def attach_positions(document: Document, findings: list[Finding]) -> None:
+    """Gives each finding a page and, when the quoted text or code can be
+    found on that page, a bbox (fractions of the page) so the front end can
+    pin it on the rendered sheet — like a reviewer's markup in Trazo."""
+    for finding in findings:
+        if finding.page is None:
+            refs = [finding.sheet, *(finding.locations or [])]
+            match = next((m for m in (_PAGE_REF.search(r) for r in refs) if m), None)
+            if match:
+                finding.page = int(match.group(1))
+        if finding.page is None or finding.bbox or not (1 <= finding.page <= len(document.pages)):
+            continue
+        page = document.pages[finding.page - 1]
+        span = _locate(page, finding)
+        if span is not None and page.width and page.height:
+            finding.bbox = [
+                round(max(0.0, span.x0 / page.width), 4),
+                round(max(0.0, span.y0 / page.height), 4),
+                round(min(1.0, span.x1 / page.width), 4),
+                round(min(1.0, span.y1 / page.height), 4),
+            ]
+
+
+def _locate(page, finding: Finding):
+    quotes = [q for loc in (finding.locations or []) for q in _QUOTE.findall(loc)]
+    for quote in quotes:
+        upper = quote.upper()
+        parts = sorted(
+            (s for s in page.spans if len(s.text.strip()) >= 3 and s.text.strip().upper() in upper),
+            key=lambda s: -len(s.text.strip()),
+        )
+        if parts:
+            return parts[0]
+    for code in _CODE.findall(finding.title):
+        exact = [s for s in page.spans if s.text.strip() == code]
+        if exact:
+            return exact[0]
+    return None
 
 
 def analyze_pdf(
