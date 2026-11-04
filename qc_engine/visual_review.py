@@ -280,6 +280,7 @@ def run_visual_review(
 
     findings: list[Finding] = []
     failed: list[str] = []
+    errors: list[str] = []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = [(batches[i], pool.submit(call, i)) for i in range(len(batches))]
         for (group, floor, pages), future in futures:
@@ -288,6 +289,7 @@ def run_visual_review(
             except Exception as exc:  # network/API errors must not sink the deterministic results
                 logger.warning("visual review failed for %s: %s", group, exc)
                 failed.extend(p.label() for p in pages)
+                errors.append(f"{type(exc).__name__}: {str(exc)[:300]}")
 
     if failed:
         findings.append(
@@ -297,7 +299,10 @@ def run_visual_review(
                 sheet=" · ".join(failed[:3]) + (" · ..." if len(failed) > 3 else ""),
                 confidence="Menor",
                 evidence="Visual",
-                summary=f"A verificação visual (regras do Trazo) não rodou em {len(failed)} prancha(s) por erro na API.",
+                summary=(
+                    f"A verificação visual (regras do Trazo) não rodou em {len(failed)} prancha(s) por erro na API: "
+                    + " | ".join(dict.fromkeys(errors))
+                ),
                 expected="Rodar a análise de novo. Se persistir, conferir a ANTHROPIC_API_KEY no Render.",
                 locations=failed,
             )
