@@ -36,7 +36,10 @@ SWING_MIN_INCHES = 34
 
 POCKET_PATTERN = re.compile(r"POCKET", re.IGNORECASE)
 SWING_CLASS_PATTERN = re.compile(r"SWING|DOUBLE|INVISIBLE", re.IGNORECASE)
-AC_ROOM_PATTERN = re.compile(r"\bA/?C\.?\s*\d|\bA/C\b", re.IGNORECASE)
+AC_ROOM_PATTERN = re.compile(r"\bA/?C\.?\s*\d|\bA/C\b|\bA\.?C\.?\s+(CLOSET|ROOM)", re.IGNORECASE)
+# Shower glass doors (Glass Schedule) are not passage doors — confirmed as
+# false positives on the CASA@63 R05.1 package (G2 28", G3 30" shower entries).
+SHOWER_PATTERN = re.compile(r"SHOWER", re.IGNORECASE)
 
 
 class DoorClearanceRule(Rule):
@@ -64,6 +67,8 @@ def _check_row(page: Page, header: TextSpan, code: str, spans: list[TextSpan]) -
     text = row_text(spans)
     if AC_ROOM_PATTERN.search(text):
         return None  # AC/mechanical closet door — not a passage door
+    if SHOWER_PATTERN.search(text) or "GLASS" in header.text.upper() and "SHOWER" in text.upper():
+        return None  # shower glass door — not a passage door
     width_match = WIDTH_PATTERN.search(text)
     if width_match is None:
         return None

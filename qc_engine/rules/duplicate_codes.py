@@ -29,6 +29,11 @@ HEADER_PATTERN = re.compile(r"SCHEDULE|LEGEND", re.IGNORECASE)
 # just "LEGEND" — confirmed against a real Revit package where the colon
 # variant slipped past a colon-less pattern and produced false positives.
 GENERIC_LEGEND_HEADER = re.compile(r"^LEGEND:?$", re.IGNORECASE)
+# Found on real DS packages (Hibiscus R06, Shair R08): the Revit revision
+# table and AutoCAD "COLOR LEGEND" door keys reuse D00/G00 placeholders,
+# which read as duplicates without these two exclusions.
+REVISION_HEADER = re.compile(r"REVISION", re.IGNORECASE)
+GENERIC_CODE = re.compile(r"^[A-Z]{1,3}[-.]?0+$")
 
 
 class DuplicateScheduleCodeRule(Rule):
@@ -46,9 +51,11 @@ class DuplicateScheduleCodeRule(Rule):
 
 def _find_duplicates(page: Page, header: TextSpan, rows: Rows) -> list[Finding]:
     findings = []
+    if REVISION_HEADER.search(header.text):
+        return findings  # revision tables, not code-keyed schedules
     for code, instances in rows.items():
-        if len(instances) < 2:
-            continue
+        if len(instances) < 2 or GENERIC_CODE.match(code):
+            continue  # "D00"/"G00" are DS's generic symbol-key placeholders
 
         descriptions = [row_text(spans) for spans in instances]
         distinct = {_normalize(d) for d in descriptions if d}
