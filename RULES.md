@@ -31,7 +31,7 @@ Typos sistêmicos (regra 1) ganharam: HARWARE, THICKNEES, WASJING, BDIDET, SWITC
 
 As regras abaixo dependem de enxergar o desenho (bubbles, cores, hatches, cotas, alinhamentos) e de comparar pranchas relacionadas, então rodam numa camada visual com Claude (`qc_engine/visual_review.py`): cada prancha é renderizada e as pranchas da mesma disciplina e do mesmo andar vão juntas numa chamada (ex.: RCP + Lighting + Circuits do 1º andar). Achados vêm como evidência **Visual**, confiança Média ou Menor, com o ID da regra.
 
-- Liga sozinha quando `ANTHROPIC_API_KEY` está configurada no Render. Para desligar: `QC_VISUAL_RULES=off`. Modelo: `QC_VISUAL_MODEL` (padrão `claude-sonnet-4-5`).
+- Liga sozinha quando `ANTHROPIC_API_KEY` está configurada no Render. Para desligar: `QC_VISUAL_RULES=off`. Modelo: `QC_VISUAL_MODEL` (padrão `claude-sonnet-5-5`).
 - Catálogo completo (80 regras, com origem de cada uma): `qc_engine/data/trazo_rules.json`. As 9 que o motor de texto já cobre ficam fora da camada visual para não duplicar.
 - Fonte: 642 tasks e comentários de 73 boards em 11 projetos do Trazo (leitura apenas, nov/2026).
 
