@@ -43,7 +43,8 @@ from .rules.floor_quantity_note import _floor_of
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "claude-sonnet-4-5"
+# Sonnet 4.5 is deprecated (retires 2026-11-30); 5.5 is its replacement and cheaper.
+DEFAULT_MODEL = "claude-sonnet-5-5"
 MAX_IMAGE_SIDE = 1568  # px — larger images are downscaled by the API anyway
 MAX_PAGES_PER_CALL = 5
 MAX_TEXT_PER_PAGE = 4000  # chars of extracted text sent alongside each image
